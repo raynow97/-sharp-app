@@ -436,6 +436,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .auth-form{display:flex;flex-direction:column;gap:12px;}
 .auth-err{font-size:12px;color:#ff6b6b;text-align:center;display:none;margin-top:2px;padding:8px;background:rgba(255,107,107,0.08);border-radius:8px;}
 .auth-err.show{display:block;}
+.auth-ok{font-size:12px;color:var(--accent);text-align:center;display:none;margin-top:2px;padding:8px;background:var(--accent-dim);border-radius:8px;}
+.auth-ok.show{display:block;}
+.forgot-link{font-size:12px;color:var(--text-faint);text-align:right;cursor:pointer;transition:color 0.15s;margin-top:-4px;}
+.forgot-link:hover{color:var(--text-dim);}
 
 /* ══════════════════════════
    SETTINGS VIEW
@@ -477,7 +481,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       </div>
       <input class="ob-input" id="auth-email" type="email" placeholder="Email address" autocomplete="email">
       <input class="ob-input" id="auth-password" type="password" placeholder="Password" autocomplete="current-password">
+      <div class="forgot-link" id="forgot-link" onclick="handleForgotPassword()">Forgot password?</div>
       <div class="auth-err" id="auth-err"></div>
+      <div class="auth-ok" id="auth-ok"></div>
       <button class="btn-main" id="auth-submit-btn" onclick="handleAuth()">Log In</button>
     </div>
   </div>
@@ -1143,7 +1149,26 @@ function switchAuthTab(tab) {
   document.getElementById('tab-signup').classList.toggle('active', tab==='signup');
   document.getElementById('auth-submit-btn').textContent = tab==='login' ? 'Log In' : 'Create Account';
   document.getElementById('signup-name-wrap').style.display = tab==='signup' ? 'block' : 'none';
+  document.getElementById('forgot-link').style.display = tab==='login' ? 'block' : 'none';
   document.getElementById('auth-err').classList.remove('show');
+  document.getElementById('auth-ok').classList.remove('show');
+}
+
+async function handleForgotPassword() {
+  const email = document.getElementById('auth-email').value.trim();
+  if (!email) { showAuthError('Enter your email address above first.'); return; }
+  document.getElementById('auth-err').classList.remove('show');
+  try {
+    const { error } = await db.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.href
+    });
+    if (error) throw error;
+    const ok = document.getElementById('auth-ok');
+    ok.textContent = 'Reset link sent — check your inbox.';
+    ok.classList.add('show');
+  } catch(e) {
+    showAuthError(e.message || 'Could not send reset email.');
+  }
 }
 
 function showAuthError(msg) {
