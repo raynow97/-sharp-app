@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Sharp — Speed Reader</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<style>
+:root {
+  --bg: #080808;
+  --surface: #111;
+  --surface2: #181818;
+  --surface3: #1e1e1e;
+  --border: #1e1e1e;
+  --border2: #2a2a2a;
+  --text: #f0f0f0;
+  --text-dim: #777;
+  --text-faint: #333;
+  --accent: #c8ff57;
+  --accent-dim: rgba(200,255,87,0.1);
+  --accent-glow: rgba(200,255,87,0.2);
+  --serif: 'Fraunces', serif;
+  --sans: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);}
+
+/* ── SCREENS ── */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity 0.25s;}
+.screen.active{opacity:1;pointer-events:all;}
+
+/* ══════════════════════════
+   ONBOARDING
+══════════════════════════ */
+#s-onboard{background:var(--bg);align-items:center;justify-content:center;padding:32px;}
+
+.ob-inner{width:100%;max-width:400px;display:flex;flex-direction:column;gap:0;}
+
+.ob-logo{font-family:var(--serif);font-size:42px;font-weight:700;color:var(--text);letter-spacing:-0.04em;margin-bottom:8px;}
+.ob-logo span{color:var(--accent);}
+.ob-tagline{font-size:15px;color:var(--text-dim);margin-bottom:48px;line-height:1.5;}
+
+.ob-step{display:none;}
+.ob-step.active{display:flex;flex-direction:column;gap:16px;}
+
+.ob-label{font-family:var(--mono);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-faint);}
+.ob-heading{font-family:var(--serif);font-size:26px;font-weight:600;letter-spacing:-0.02em;line-height:1.2;margin-bottom:4px;}
+
+.ob-input{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:10px;
+  padding:14px 16px;
+  color:var(--text);
+  font-family:var(--sans);
+  font-size:16px;
+  outline:none;
+  transition:border-color 0.2s;
+  width:100%;
+}
+.ob-input:focus{border-color:var(--accent);}
+.ob-input::placeholder{color:var(--text-faint);}
+
+.ob-cats{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.ob-cat{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:10px;
+  padding:14px 12px;
+  cursor:pointer;
+  transition:all 0.15s;
+  text-align:left;
+}
+.ob-cat:hover{border-color:var(--border2);background:var(--surface2);}
+.ob-cat.selected{border-color:var(--accent);background:var(--accent-dim);}
+.ob-cat-icon{font-size:20px;margin-bottom:6px;}
+.ob-cat-name{font-size:13px;font-weight:600;color:var(--text);}
+.ob-cat-sub{font-size:11px;color:var(--text-dim);margin-top:2px;}
+
+.btn-main{
+  background:var(--accent);
+  color:#000;
+  border:none;
+  border-radius:10px;
+  padding:15px;
+  font-family:var(--sans);
+  font-size:15px;
+  font-weight:700;
+  cursor:pointer;
+  width:100%;
+  transition:transform 0.1s,background 0.1s;
+  letter-spacing:-0.01em;
+}
+.btn-main:hover{background:#d4ff6e;}
+.btn-main:active{transform:scale(0.97);}
+.btn-main:disabled{background:var(--surface2);color:var(--text-faint);cursor:not-allowed;transform:none;}
+
+.ob-skip{text-align:center;font-size:13px;color:var(--text-faint);cursor:pointer;padding:8px;transition:color 0.15s;}
+.ob-skip:hover{color:var(--text-dim);}
+
+/* tutorial screens */
+.tut-visual{
+  height:180px;
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-bottom:4px;
+  position:relative;
+  overflow:hidden;
+}
+.tut-word{font-family:var(--serif);font-size:48px;font-weight:700;color:var(--text);}
+.tut-word .p{color:var(--accent);}
+@keyframes tutFlash{0%,100%{opacity:0}10%,90%{opacity:1}}
+.tut-word{animation:tutFlash 1.2s infinite;}
+
+.tut-dots{display:flex;gap:6px;justify-content:center;margin-top:8px;}
+.tut-dot{width:6px;height:6px;border-radius:50%;background:var(--border2);}
+.tut-dot.on{background:var(--accent);}
+
+/* ══════════════════════════
+   MAIN APP SHELL
+══════════════════════════ */
+#s-app{background:var(--bg);flex-direction:row;}
+
+.app-sidebar{
+  width:260px;
+  flex-shrink:0;
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  padding:0;
+}
+
+.sidebar-top{
+  padding:28px 20px 20px;
+  border-bottom:1px solid var(--border);
+}
+
+.sidebar-logo{font-family:var(--serif);font-size:20px;font-weight:700;letter-spacing:-0.03em;color:var(--text);}
+.sidebar-logo span{color:var(--accent);}
+
+.sidebar-user{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:16px;
+}
+.sidebar-avatar{
+  width:32px;height:32px;
+  border-radius:50%;
+  background:var(--accent-dim);
+  border:1px solid var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:13px;color:var(--accent);
+  flex-shrink:0;
+}
+.sidebar-name{font-size:13px;font-weight:500;}
+.sidebar-cat{font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:1px;}
+
+.sidebar-nav{padding:12px 12px;flex:1;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 12px;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:13px;font-weight:500;
+  color:var(--text-dim);
+  transition:all 0.15s;
+  margin-bottom:2px;
+}
+.nav-item:hover{background:var(--surface);color:var(--text);}
+.nav-item.active{background:var(--accent-dim);color:var(--accent);}
+.nav-item svg{flex-shrink:0;}
+
+.sidebar-bottom{padding:16px 20px;border-top:1px solid var(--border);}
+.sidebar-trial{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:8px;
+  padding:12px;
+}
+.trial-label{font-family:var(--mono);font-size:9px;letter-spacing:0.15em;text-transform:uppercase;color:var(--text-faint);margin-bottom:4px;}
+.trial-text{font-size:12px;color:var(--text-dim);}
+.trial-text strong{color:var(--accent);}
+
+/* main content */
+.app-main{flex:1;overflow:hidden;display:flex;flex-direction:column;}
+
+/* ── LIBRARY VIEW ── */
+#v-library{flex:1;overflow-y:auto;padding:32px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+
+.lib-header{margin-bottom:32px;}
+.lib-greeting{font-family:var(--serif);font-size:28px;font-weight:700;letter-spacing:-0.03em;}
+.lib-sub{font-size:14px;color:var(--text-dim);margin-top:4px;}
+
+.lib-continue{
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-radius:14px;
+  padding:20px;
+  display:flex;align-items:center;gap:16px;
+  cursor:pointer;
+  margin-bottom:32px;
+  transition:border-color 0.2s,transform 0.15s;
+}
+.lib-continue:hover{border-color:var(--accent);transform:translateY(-1px);}
+.continue-spine{width:48px;height:64px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.continue-info{flex:1;min-width:0;}
+.continue-eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:4px;}
+.continue-title{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.continue-chapter{font-size:12px;color:var(--text-dim);margin-top:2px;}
+.continue-prog{margin-top:8px;}
+.prog-track{height:2px;background:var(--border2);border-radius:2px;}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;}
+.prog-pct{font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:4px;}
+.continue-arrow{color:var(--text-faint);flex-shrink:0;}
+
+.section-title{font-family:var(--mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-faint);margin-bottom:14px;}
+
+.book-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:32px;}
+
+.book-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:16px;
+  cursor:pointer;
+  transition:all 0.15s;
+}
+.book-card:hover{border-color:var(--border2);background:var(--surface2);transform:translateY(-2px);}
+.book-card-cover{width:100%;aspect-ratio:3/4;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:12px;}
+.book-card-title{font-size:13px;font-weight:600;line-height:1.3;margin-bottom:4px;}
+.book-card-subject{font-family:var(--mono);font-size:10px;color:var(--text-dim);}
+.book-card-prog{margin-top:10px;}
+
+/* ── DETAIL VIEW ── */
+#v-detail{flex:1;overflow-y:auto;padding:32px;display:none;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+
+.back-row{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text-dim);font-size:13px;font-family:var(--mono);margin-bottom:24px;width:fit-content;transition:color 0.15s;}
+.back-row:hover{color:var(--text);}
+
+.detail-top{display:flex;gap:24px;align-items:flex-start;margin-bottom:32px;}
+.detail-cover{width:80px;height:106px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:36px;flex-shrink:0;}
+.detail-meta{flex:1;}
+.detail-title{font-family:var(--serif);font-size:24px;font-weight:700;letter-spacing:-0.02em;line-height:1.2;}
+.detail-subject{font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:4px;}
+.detail-overall{display:flex;align-items:center;gap:12px;margin-top:14px;}
+.detail-overall-track{flex:1;height:3px;background:var(--border2);border-radius:3px;}
+.detail-overall-fill{height:100%;background:var(--accent);border-radius:3px;}
+.detail-overall-pct{font-family:var(--mono);font-size:12px;color:var(--accent);}
+.detail-actions{display:flex;gap:10px;margin-top:16px;}
+.btn-continue{flex:1;background:var(--accent);color:#000;border:none;border-radius:10px;padding:13px;font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;transition:all 0.1s;}
+.btn-continue:hover{background:#d4ff6e;}
+.btn-restart{background:var(--surface);color:var(--text-dim);border:1px solid var(--border2);border-radius:10px;padding:13px 18px;font-family:var(--sans);font-size:13px;cursor:pointer;transition:all 0.1s;white-space:nowrap;}
+.btn-restart:hover{color:var(--text);border-color:var(--border2);}
+
+.chapter-list-header{font-family:var(--mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-faint);margin-bottom:12px;}
+.chapter-item{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--border);cursor:pointer;transition:opacity 0.15s;}
+.chapter-item:hover{opacity:0.75;}
+.ch-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;flex-shrink:0;}
+.ch-num.done{background:var(--accent);color:#000;}
+.ch-num.current{background:var(--accent-dim);border:1px solid var(--accent);color:var(--accent);}
+.ch-num.pending{background:var(--surface2);color:var(--text-faint);}
+.ch-info{flex:1;}
+.ch-name{font-size:13px;font-weight:500;}
+.ch-name.pending{color:var(--text-dim);}
+.ch-prog-mini{height:2px;background:var(--border2);border-radius:2px;margin-top:5px;}
+.ch-prog-mini-fill{height:100%;background:var(--accent);border-radius:2px;}
+
+/* ── READER VIEW ── */
+#v-reader{flex:1;display:none;flex-direction:column;background:var(--bg);}
+
+.reader-top{
+  padding:20px 24px 0;
+  display:flex;align-items:flex-start;justify-content:space-between;
+  flex-shrink:0;
+  border-bottom:1px solid var(--border);
+  padding-bottom:16px;
+}
+.reader-meta{flex:1;min-width:0;}
+.reader-book{font-family:var(--mono);font-size:10px;color:var(--text-faint);letter-spacing:0.1em;text-transform:uppercase;}
+.reader-chapter{font-size:13px;color:var(--text-dim);margin-top:3px;font-weight:500;}
+.reader-close{
+  width:32px;height:32px;border-radius:50%;
+  background:var(--surface);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;transition:all 0.15s;
+}
+.reader-close:hover{background:var(--surface2);}
+
+.word-stage{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  position:relative;padding:0 40px;
+}
+.v-guide{position:absolute;top:15%;bottom:15%;left:50%;width:1px;background:linear-gradient(to bottom,transparent,var(--accent),transparent);opacity:0.06;transform:translateX(-50%);}
+.pivot-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0.4;margin-bottom:20px;}
+#word-el{
+  font-family:var(--serif);
+  font-size:clamp(40px,5vw,64px);
+  font-weight:600;
+  letter-spacing:-0.03em;
+  line-height:1;
+  text-align:center;
+  min-height:1.2em;
+  display:flex;align-items:center;justify-content:center;
+}
+.w-b{color:var(--text-dim);}
+.w-p{color:var(--accent);}
+.w-a{color:var(--text);}
+@keyframes wPop{from{opacity:0;transform:scale(0.96)}to{opacity:1;transform:scale(1)}}
+.pop{animation:wPop 0.07s ease-out forwards;}
+.pivot-dot-b{width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0.4;margin-top:20px;}
+.idle-hint{font-family:var(--mono);font-size:13px;color:var(--text-faint);}
+
+.reader-prog{padding:0 24px;margin-bottom:12px;flex-shrink:0;}
+.rprog-track{height:2px;background:var(--border2);border-radius:2px;}
+.rprog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.12s linear;width:0%;}
+.rprog-labels{display:flex;justify-content:space-between;margin-top:6px;font-family:var(--mono);font-size:10px;color:var(--text-faint);}
+
+.ctrl-panel{
+  background:var(--surface);
+  border-top:1px solid var(--border);
+  padding:16px 24px 20px;
+  flex-shrink:0;
+}
+.ctrl-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.ctrl-lbl{font-family:var(--mono);font-size:10px;color:var(--text-faint);letter-spacing:0.1em;text-transform:uppercase;min-width:44px;}
+.preset-row{display:flex;gap:6px;flex:1;}
+.preset{
+  flex:1;padding:7px 0;background:transparent;
+  border:1px solid var(--border2);border-radius:6px;
+  color:var(--text-dim);font-family:var(--mono);font-size:11px;
+  cursor:pointer;text-align:center;transition:all 0.15s;
+}
+.preset.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.chunk-row{display:flex;gap:6px;flex:1;}
+.chunk{
+  flex:1;padding:7px 0;background:transparent;
+  border:1px solid var(--border2);border-radius:6px;
+  color:var(--text-dim);font-family:var(--mono);font-size:11px;
+  cursor:pointer;text-align:center;transition:all 0.15s;
+}
+.chunk.on{border-color:var(--accent);color:var(--accent);background:var(--accent-dim);}
+.play-row{display:flex;align-items:center;justify-content:center;gap:14px;margin-top:6px;}
+.icon-btn{
+  width:40px;height:40px;border-radius:50%;
+  background:transparent;border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--text-dim);transition:all 0.15s;
+}
+.icon-btn:hover{background:var(--surface2);color:var(--text);}
+.icon-btn:active{transform:scale(0.92);}
+.play-btn{
+  width:56px;height:56px;border-radius:50%;
+  background:var(--accent);border:none;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:transform 0.1s,background 0.1s;
+}
+.play-btn:hover{background:#d4ff6e;}
+.play-btn:active{transform:scale(0.92);}
+
+/* chapter complete overlay */
+.overlay{
+  position:absolute;inset:0;
+  background:rgba(8,8,8,0.96);backdrop-filter:blur(8px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px;z-index:50;opacity:0;pointer-events:none;transition:opacity 0.25s;
+}
+.overlay.show{opacity:1;pointer-events:all;}
+.ov-icon{width:64px;height:64px;border-radius:50%;background:var(--accent-dim);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;margin-bottom:20px;}
+.ov-title{font-family:var(--serif);font-size:24px;font-weight:700;letter-spacing:-0.02em;text-align:center;margin-bottom:8px;}
+.ov-sub{font-family:var(--mono);font-size:12px;color:var(--text-dim);text-align:center;margin-bottom:32px;}
+.ov-btns{display:flex;flex-direction:column;gap:10px;width:100%;max-width:280px;}
+.btn-ov-next{background:var(--accent);color:#000;border:none;border-radius:10px;padding:14px;font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;transition:all 0.1s;}
+.btn-ov-next:hover{background:#d4ff6e;}
+.btn-ov-back{background:var(--surface);color:var(--text-dim);border:1px solid var(--border2);border-radius:10px;padding:14px;font-family:var(--sans);font-size:13px;cursor:pointer;transition:all 0.1s;text-align:center;}
+.btn-ov-back:hover{color:var(--text);}
+
+/* diagram overlay */
+#diag-ov{
+  position:absolute;inset:0;background:rgba(8,8,8,0.97);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:32px;z-index:60;opacity:0;pointer-events:none;transition:opacity 0.2s;
+}
+#diag-ov.show{opacity:1;pointer-events:all;}
+.diag-lbl{font-family:var(--mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--accent);margin-bottom:20px;}
+.diag-box{width:100%;max-width:360px;aspect-ratio:4/3;background:var(--surface);border:1px solid var(--border2);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-dim);font-size:13px;margin-bottom:24px;}
+
+/* mobile bottom nav */
+.mobile-nav{display:none;}
+
+/* ── RESPONSIVE ── */
+@media(max-width:768px){
+  #s-app{flex-direction:column;}
+  .app-sidebar{display:none;}
+  .mobile-nav{
+    display:flex;
+    position:fixed;bottom:0;left:0;right:0;
+    height:60px;background:var(--surface);
+    border-top:1px solid var(--border);
+    align-items:center;justify-content:space-around;
+    z-index:20;
+  }
+  .mob-nav-btn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 16px;color:var(--text-faint);font-family:var(--mono);font-size:9px;cursor:pointer;transition:color 0.15s;}
+  .mob-nav-btn.on{color:var(--accent);}
+  .mob-nav-btn.on svg{stroke:var(--accent);}
+  #v-library,#v-detail{padding:20px 16px 80px;}
+  #v-reader .ctrl-panel{padding:12px 16px 16px;}
+  .word-stage{padding:0 24px;}
+  .book-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+}
+
+/* scrollbar */
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+
+/* ══════════════════════════
+   AUTH SCREEN
+══════════════════════════ */
+#s-auth{background:var(--bg);align-items:center;justify-content:center;padding:32px;}
+.auth-inner{width:100%;max-width:380px;display:flex;flex-direction:column;}
+.auth-logo{font-family:var(--serif);font-size:42px;font-weight:700;color:var(--text);letter-spacing:-0.04em;margin-bottom:8px;}
+.auth-logo span{color:var(--accent);}
+.auth-tagline{font-size:15px;color:var(--text-dim);margin-bottom:40px;line-height:1.5;}
+.auth-tabs{display:flex;margin-bottom:24px;background:var(--surface);border:1px solid var(--border2);border-radius:10px;overflow:hidden;}
+.auth-tab{flex:1;padding:12px;text-align:center;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-dim);border:none;font-family:var(--sans);transition:all 0.15s;}
+.auth-tab.active{background:var(--accent);color:#000;}
+.auth-form{display:flex;flex-direction:column;gap:12px;}
+.auth-err{font-size:12px;color:#ff6b6b;text-align:center;display:none;margin-top:2px;padding:8px;background:rgba(255,107,107,0.08);border-radius:8px;}
+.auth-err.show{display:block;}
+
+/* ══════════════════════════
+   SETTINGS VIEW
+══════════════════════════ */
+#v-settings{flex:1;overflow-y:auto;padding:32px;display:none;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+.settings-heading{font-family:var(--serif);font-size:28px;font-weight:700;letter-spacing:-0.03em;margin-bottom:28px;}
+.settings-section{margin-bottom:28px;}
+.settings-section-label{font-family:var(--mono);font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-faint);margin-bottom:12px;}
+.settings-card{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:20px;}
+.settings-plan-row{display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.plan-name{font-size:15px;font-weight:600;}
+.plan-desc{font-size:13px;color:var(--text-dim);margin-top:4px;}
+.btn-subscribe{background:var(--accent);color:#000;border:none;border-radius:8px;padding:10px 20px;font-family:var(--sans);font-size:13px;font-weight:700;cursor:pointer;transition:all 0.1s;white-space:nowrap;flex-shrink:0;}
+.btn-subscribe:hover{background:#d4ff6e;}
+.btn-subscribe:disabled{background:var(--surface2);color:var(--text-faint);cursor:not-allowed;}
+.settings-account-row{display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.account-email{font-size:14px;font-weight:600;}
+.account-name{font-size:12px;color:var(--text-dim);margin-top:3px;}
+.btn-logout{background:transparent;color:#ff6b6b;border:1px solid rgba(255,107,107,0.3);border-radius:8px;padding:8px 16px;font-family:var(--sans);font-size:13px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.btn-logout:hover{background:rgba(255,107,107,0.08);}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════
+     AUTH
+══════════════════════════ -->
+<div class="screen active" id="s-auth">
+  <div class="auth-inner">
+    <div class="auth-logo">Sharp<span>.</span></div>
+    <div class="auth-tagline">Read faster. Revise smarter.<br>Built for Indian competitive exams.</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tab-login" onclick="switchAuthTab('login')">Log In</button>
+      <button class="auth-tab" id="tab-signup" onclick="switchAuthTab('signup')">Sign Up</button>
+    </div>
+    <div class="auth-form">
+      <div id="signup-name-wrap" style="display:none">
+        <input class="ob-input" id="auth-fullname" type="text" placeholder="Your full name" autocomplete="name">
+      </div>
+      <input class="ob-input" id="auth-email" type="email" placeholder="Email address" autocomplete="email">
+      <input class="ob-input" id="auth-password" type="password" placeholder="Password" autocomplete="current-password">
+      <div class="auth-err" id="auth-err"></div>
+      <button class="btn-main" id="auth-submit-btn" onclick="handleAuth()">Log In</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════
+     ONBOARDING
+══════════════════════════ -->
+<div class="screen" id="s-onboard">
+  <div class="ob-inner">
+    <div class="ob-logo">Sharp<span>.</span></div>
+    <div class="ob-tagline">Read faster. Revise smarter.<br>Built for Indian competitive exams.</div>
+
+    <!-- Step 1: Name -->
+    <div class="ob-step active" id="ob-s1">
+      <div class="ob-label">Step 1 of 3</div>
+      <div class="ob-heading">What's your name?</div>
+      <input class="ob-input" id="ob-name" type="text" placeholder="Your first name" autocomplete="off">
+      <button class="btn-main" id="ob-s1-next" onclick="obStep1()">Continue →</button>
+    </div>
+
+    <!-- Step 2: Category -->
+    <div class="ob-step" id="ob-s2">
+      <div class="ob-label">Step 2 of 3</div>
+      <div class="ob-heading">What are you here for?</div>
+      <div class="ob-cats">
+        <div class="ob-cat" onclick="selectCat(this,'jee')">
+          <div class="ob-cat-icon">⚗️</div>
+          <div class="ob-cat-name">JEE</div>
+          <div class="ob-cat-sub">Engineering entrance</div>
+        </div>
+        <div class="ob-cat" onclick="selectCat(this,'neet')">
+          <div class="ob-cat-icon">🔬</div>
+          <div class="ob-cat-name">NEET</div>
+          <div class="ob-cat-sub">Medical entrance</div>
+        </div>
+        <div class="ob-cat" onclick="selectCat(this,'upsc')">
+          <div class="ob-cat-icon">🏛️</div>
+          <div class="ob-cat-name">UPSC</div>
+          <div class="ob-cat-sub">Civil services</div>
+        </div>
+        <div class="ob-cat" onclick="selectCat(this,'ca')">
+          <div class="ob-cat-icon">📊</div>
+          <div class="ob-cat-name">CA</div>
+          <div class="ob-cat-sub">Chartered accountancy</div>
+        </div>
+        <div class="ob-cat" onclick="selectCat(this,'school')">
+          <div class="ob-cat-icon">📚</div>
+          <div class="ob-cat-name">School</div>
+          <div class="ob-cat-sub">Class 6–12</div>
+        </div>
+        <div class="ob-cat" onclick="selectCat(this,'general')">
+          <div class="ob-cat-icon">📖</div>
+          <div class="ob-cat-name">General</div>
+          <div class="ob-cat-sub">Reading & learning</div>
+        </div>
+      </div>
+      <button class="btn-main" id="ob-s2-next" disabled onclick="obStep2()">Continue →</button>
+    </div>
+
+    <!-- Step 3: Tutorial -->
+    <div class="ob-step" id="ob-s3">
+      <div class="ob-label">Step 3 of 3 — How it works</div>
+      <div class="ob-heading" id="tut-heading">Words flash one at a time</div>
+      <div class="tut-visual">
+        <div class="tut-word" id="tut-word-el"><span style="color:var(--text-dim)">re</span><span class="p">a</span><span>ding</span></div>
+      </div>
+      <div class="tut-dots">
+        <div class="tut-dot on" id="td0"></div>
+        <div class="tut-dot" id="td1"></div>
+        <div class="tut-dot" id="td2"></div>
+      </div>
+      <div style="color:var(--text-dim);font-size:14px;line-height:1.6;" id="tut-desc">Your brain processes each word visually — no back-and-forth eye movement. Result: 2–3× faster reading.</div>
+      <button class="btn-main" id="ob-s3-btn" onclick="obTutNext()">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════
+     MAIN APP
+══════════════════════════ -->
+<div class="screen" id="s-app">
+
+  <!-- Sidebar -->
+  <div class="app-sidebar">
+    <div class="sidebar-top">
+      <div class="sidebar-logo">Sharp<span>.</span></div>
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sb-avatar">R</div>
+        <div>
+          <div class="sidebar-name" id="sb-name">Reader</div>
+          <div class="sidebar-cat" id="sb-cat">JEE Preparation</div>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" id="nav-lib" onclick="showView('library')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        Home
+      </div>
+      <div class="nav-item" id="nav-books" onclick="showView('library')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Library
+      </div>
+      <div class="nav-item" id="nav-settings" onclick="showSettingsView()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </div>
+    </div>
+    <div class="sidebar-bottom">
+      <div class="sidebar-trial">
+        <div class="trial-label">Demo mode</div>
+        <div class="trial-text">Full access enabled.<br><strong>Sharp Beta</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="app-main">
+
+    <!-- Library View -->
+    <div id="v-library" style="flex:1;overflow-y:auto;padding:32px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;">
+      <div class="lib-header">
+        <div class="lib-greeting" id="lib-greeting">Good morning.</div>
+        <div class="lib-sub" id="lib-sub">Continue where you left off</div>
+      </div>
+
+      <!-- Continue reading -->
+      <div class="lib-continue" id="lib-continue" onclick="openBookById(0)">
+        <div class="continue-spine" style="background:#1a1f1a">⚛️</div>
+        <div class="continue-info">
+          <div class="continue-eyebrow">Continue reading</div>
+          <div class="continue-title">NCERT Physics Part I</div>
+          <div class="continue-chapter">Chapter 2 · Units and Measurement</div>
+          <div class="continue-prog">
+            <div class="prog-track"><div class="prog-fill" style="width:30%"></div></div>
+            <div class="prog-pct">30% complete</div>
+          </div>
+        </div>
+        <div class="continue-arrow">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <div class="section-title" id="lib-section-title">Physics</div>
+      <div class="book-grid" id="book-grid"></div>
+    </div>
+
+    <!-- Detail View -->
+    <div id="v-detail" style="flex:1;overflow-y:auto;padding:32px;display:none;scrollbar-width:thin;scrollbar-color:var(--border2) transparent;">
+      <div class="back-row" onclick="showView('library')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
+        Back to Library
+      </div>
+      <div class="detail-top">
+        <div class="detail-cover" id="d-cover"></div>
+        <div class="detail-meta">
+          <div class="detail-title" id="d-title"></div>
+          <div class="detail-subject" id="d-subject"></div>
+          <div class="detail-overall">
+            <div class="detail-overall-track"><div class="detail-overall-fill" id="d-overall-fill" style="width:0%"></div></div>
+            <div class="detail-overall-pct" id="d-overall-pct">0%</div>
+          </div>
+          <div class="detail-actions">
+            <button class="btn-continue" onclick="openReader()">Continue Reading</button>
+            <button class="btn-restart" onclick="restartBook()">↺ Ch.1</button>
+          </div>
+        </div>
+      </div>
+      <div class="chapter-list-header">Chapters</div>
+      <div id="chapter-list"></div>
+    </div>
+
+    <!-- Reader View -->
+    <div id="v-reader" style="flex:1;display:none;flex-direction:column;background:var(--bg);position:relative;">
+      <div class="reader-top">
+        <div class="reader-meta">
+          <div class="reader-book" id="r-book"></div>
+          <div class="reader-chapter" id="r-chapter"></div>
+        </div>
+        <div class="reader-close" onclick="exitReader()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#777" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </div>
+      </div>
+      <div class="word-stage">
+        <div class="v-guide"></div>
+        <div class="pivot-dot"></div>
+        <div id="word-el"><span class="idle-hint">press play</span></div>
+        <div class="pivot-dot-b"></div>
+      </div>
+      <div class="reader-prog">
+        <div class="rprog-track"><div class="rprog-fill" id="rprog-fill"></div></div>
+        <div class="rprog-labels">
+          <span id="rprog-l">word 0</span>
+          <span id="rprog-r">— min</span>
+        </div>
+      </div>
+      <div class="ctrl-panel">
+        <div class="ctrl-row">
+          <div class="ctrl-lbl">Speed</div>
+          <div class="preset-row">
+            <button class="preset" onclick="setWPM(150)">150</button>
+            <button class="preset on" onclick="setWPM(250)">250</button>
+            <button class="preset" onclick="setWPM(350)">350</button>
+            <button class="preset" onclick="setWPM(500)">500</button>
+          </div>
+        </div>
+        <div class="ctrl-row">
+          <div class="ctrl-lbl">Words</div>
+          <div class="chunk-row">
+            <button class="chunk on" onclick="setChunk(1)">1</button>
+            <button class="chunk" onclick="setChunk(2)">2</button>
+            <button class="chunk" onclick="setChunk(3)">3</button>
+          </div>
+        </div>
+        <div class="play-row">
+          <button class="icon-btn" onclick="skip(-10)" title="Back 10">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
+          </button>
+          <button class="icon-btn" onclick="prevChapter()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="5" width="2" height="14"/><path d="m18 5-8 7 8 7V5z"/></svg>
+          </button>
+          <button class="play-btn" id="play-btn" onclick="togglePlay()">
+            <svg id="play-icon" width="22" height="22" viewBox="0 0 24 24" fill="#000"><path d="M5 3l14 9-14 9V3z"/></svg>
+            <svg id="pause-icon" width="22" height="22" viewBox="0 0 24 24" fill="#000" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          </button>
+          <button class="icon-btn" onclick="nextChapter()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="16" y="5" width="2" height="14"/><path d="m6 5 8 7-8 7V5z"/></svg>
+          </button>
+          <button class="icon-btn" onclick="skip(10)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m13 17 5-5-5-5"/><path d="m6 17 5-5-5-5"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Chapter complete -->
+      <div class="overlay" id="ch-complete">
+        <div class="ov-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#c8ff57" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="ov-title">Chapter Complete</div>
+        <div class="ov-sub" id="ov-sub"></div>
+        <div class="ov-btns">
+          <button class="btn-ov-next" onclick="continueNextChapter()">Continue to Next Chapter</button>
+          <div class="btn-ov-back" onclick="exitReader()">Back to Book</div>
+        </div>
+      </div>
+
+      <!-- Diagram overlay -->
+      <div id="diag-ov">
+        <div class="diag-lbl">Diagram</div>
+        <div class="diag-box">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Figure — tap to close and resume
+        </div>
+        <button class="btn-main" style="max-width:280px" onclick="closeDiagram()">Resume Reading</button>
+      </div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="v-settings">
+      <div class="settings-heading">Settings</div>
+
+      <div class="settings-section">
+        <div class="settings-section-label">Subscription</div>
+        <div class="settings-card">
+          <div class="settings-plan-row">
+            <div>
+              <div class="plan-name" id="plan-name">Free Plan</div>
+              <div class="plan-desc" id="plan-desc">Upgrade for full access to all books</div>
+            </div>
+            <button class="btn-subscribe" id="btn-subscribe" onclick="openRazorpay()">Subscribe ₹2,999</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-label">Account</div>
+        <div class="settings-card">
+          <div class="settings-account-row">
+            <div>
+              <div class="account-email" id="settings-email">—</div>
+              <div class="account-name" id="settings-name">—</div>
+            </div>
+            <button class="btn-logout" onclick="handleLogout()">Log out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Mobile nav -->
+  <div class="mobile-nav">
+    <div class="mob-nav-btn on" onclick="showView('library')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Home
+    </div>
+    <div class="mob-nav-btn" onclick="showView('library')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Library
+    </div>
+    <div class="mob-nav-btn" onclick="showSettingsView()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+      Settings
+    </div>
+  </div>
+</div>
+
+<script>
+// ══ SUPABASE ══
+const SUPA_URL = 'https://vcftcekzrdcezfzzfikq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjZnRjZWt6cmRjZXpmenpmaWtxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NDA1ODUsImV4cCI6MjA4OTIxNjU4NX0.JfAfQc0P2Umb_YZSntnKW0bfySYg3_aem0CoEDBwY6w';
+const db = window.supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ══ DATA ══
+const BOOKS = [
+  {
+    id:0, title:"NCERT Physics Part I", subject:"Physics · Class 11", emoji:"⚛️", bg:"#1a1f1a",
+    category:"jee",
+    chapters:["Physical World","Units and Measurement","Motion in a Straight Line","Motion in a Plane","Laws of Motion","Work, Energy and Power"],
+    progress:[1, 0.45, 0, 0, 0, 0],
+    texts:[
+      "The universe is vast and complex. Physics is the study of nature in its most fundamental form. It seeks to understand how matter and energy interact at every scale from the subatomic to the cosmic. The scope of physics is wide. It ranges from the study of fundamental particles to the origin of the universe itself. Physics is an exciting and interesting subject. [DIAGRAM] It has given us a deep understanding of natural phenomena.",
+      "Measurement is the basis of all scientific study. Every physical quantity must be expressed in terms of a unit. The International System of Units known as SI is the modern form of the metric system. It is the world's most widely used system of measurement. [DIAGRAM] Length mass and time are the three fundamental quantities. The meter kilogram and second are the base units. Physical quantities are classified as fundamental and derived. Derived quantities are expressed in terms of fundamental quantities.",
+      "Motion is defined as the change in position of an object with time. An object is said to be in motion if its position changes with time relative to a reference frame. Rest and motion are relative terms. The simplest type of motion is motion in a straight line. [DIAGRAM] When an object moves along a straight line we can describe its motion using the concept of displacement velocity and acceleration. Speed is the magnitude of velocity. Average velocity is the total displacement divided by total time.",
+      "When an object moves in two dimensions it is said to be in planar motion. A projectile is an example of two dimensional motion. [DIAGRAM] A projectile is any object thrown into space upon which the only acting force is gravity. The equations of projectile motion can be derived using the equations of motion in one dimension applied separately to horizontal and vertical components. The horizontal component of velocity remains constant while the vertical component changes due to gravity.",
+      "Force is a push or pull that acts on an object. Newton formulated three fundamental laws that govern the motion of objects. The first law states that an object at rest stays at rest and an object in motion continues in motion unless acted upon by an external force. [DIAGRAM] The second law states that force equals mass times acceleration. The third law states that every action has an equal and opposite reaction. These three laws form the foundation of classical mechanics.",
+      "Work is done when a force acts on an object and the object moves in the direction of the force. Energy is the capacity to do work. [DIAGRAM] The work energy theorem states that the net work done on an object equals the change in its kinetic energy. Power is the rate at which work is done. The unit of work is the joule. The unit of power is the watt. Conservation of energy is one of the most fundamental principles in physics."
+    ]
+  },
+  {
+    id:1, title:"NCERT Biology", subject:"Biology · Class 11", emoji:"🧬", bg:"#1a1a1f",
+    category:"neet",
+    chapters:["The Living World","Biological Classification","Plant Kingdom","Animal Kingdom","Cell Structure"],
+    progress:[1, 0.2, 0, 0, 0],
+    texts:[
+      "Biology is the science of life. It deals with the study of living organisms including their structure function growth evolution distribution and taxonomy. The living world is incredibly diverse. From the tiniest bacteria to the largest blue whale life takes countless forms. [DIAGRAM] All living organisms share certain fundamental characteristics. They require nutrition they respire they respond to stimuli they grow they reproduce and they are capable of self regulation.",
+      "The biological classification of organisms is called taxonomy. Organisms are classified into groups based on their characteristics. [DIAGRAM] Aristotle was the first person to scientifically classify organisms. He grouped plants into trees shrubs and herbs. Modern classification is based on the work of Carl Linnaeus who introduced the binomial nomenclature system. In this system every organism is given a two part Latin name consisting of genus and species.",
+      "The plant kingdom includes all photosynthetic multicellular organisms. Plants are classified based on whether they have a vascular system seeds or flowers. [DIAGRAM] Algae are the simplest plants. They are found mostly in water. Bryophytes are land plants without vascular tissue. Pteridophytes are vascular plants without seeds. Gymnosperms produce seeds without fruits. Angiosperms are the most advanced plants producing flowers and fruits.",
+      "The animal kingdom comprises all multicellular organisms that are heterotrophs. Animals are classified based on their body plan symmetry and level of organisation. [DIAGRAM] The simplest animals are the sponges belonging to phylum Porifera. Coelenterates have radial symmetry. Platyhelminthes are flatworms. Nematodes are roundworms. Annelids are segmented worms. Arthropods are the largest phylum including insects spiders and crustaceans.",
+      "The cell is the basic structural and functional unit of all living organisms. Robert Hooke discovered the cell in 1665. [DIAGRAM] There are two types of cells prokaryotic and eukaryotic. Prokaryotic cells lack a membrane bound nucleus. Eukaryotic cells have a well defined nucleus. The cell has three main components the cell membrane the cytoplasm and the nucleus. Organelles are specialized structures within the cell that perform specific functions."
+    ]
+  },
+  {
+    id:2, title:"Indian Polity", subject:"Political Science · UPSC", emoji:"🏛️", bg:"#1f1a1a",
+    category:"upsc",
+    chapters:["Historical Background","Making of the Constitution","Salient Features","Preamble","Union and its Territory"],
+    progress:[0, 0, 0, 0, 0],
+    texts:[
+      "India's constitutional history begins with the Government of India Act 1858. This act ended the rule of the East India Company and transferred power to the British Crown. [DIAGRAM] The Indian National Congress was established in 1885. It became the leading organization demanding self governance for India. The Morley Minto Reforms of 1909 introduced separate electorates for Muslims. The Montagu Chelmsford Reforms of 1919 introduced the concept of dyarchy in provinces.",
+      "The Constituent Assembly of India was established under the Cabinet Mission Plan of 1946. Dr BR Ambedkar was the Chairman of the Drafting Committee. [DIAGRAM] The Assembly held its first meeting on December 9 1946. It took approximately two years eleven months and eighteen days to draft the Constitution. The Constitution was adopted on November 26 1949 and came into force on January 26 1950. January 26 is celebrated as Republic Day.",
+      "The Indian Constitution is unique in many respects. It is the longest written constitution in the world. [DIAGRAM] It combines rigidity with flexibility. Some provisions can be amended by a simple majority while others require a special majority and ratification by states. The Constitution establishes a parliamentary form of government. It provides for a federal system with a strong centre. Fundamental Rights and Directive Principles are the twin pillars of the Constitution.",
+      "The Preamble is the introduction to the Constitution. It declares India to be a Sovereign Socialist Secular Democratic Republic. [DIAGRAM] The word Socialist was added by the 42nd Amendment in 1976. The Preamble also commits to securing Justice Liberty and Equality for all citizens and promoting Fraternity. The Supreme Court has held that the Preamble is part of the Constitution. It can be used to interpret ambiguous constitutional provisions.",
+      "India is described as a Union of States under Article 1. This implies that states cannot secede from the Union. [DIAGRAM] The territory of India comprises the states the union territories and such other territories as may be acquired. Parliament can by law form new states and alter boundaries of existing states. The President has the power to appoint a Governor for each state. The Governor acts as the constitutional head of the state government."
+    ]
+  }
+];
+
+// ══ STATE ══
+let userName = '';
+let userCategory = '';
+let currentBook = null;
+let currentChapter = 0;
+let words = [];
+let wordIdx = 0;
+let wpm = 250;
+let chunkSize = 1;
+let playing = false;
+let timer = null;
+let obTutStep = 0;
+let currentUser = null;
+let isPremium = false;
+let currentAuthTab = 'login';
+let savedWordIdx = 0;
+
+// ══ ONBOARDING ══
+const tutData = [
+  { heading:"Words flash one at a time", desc:"Your brain processes each word visually — no back-and-forth eye movement. Result: 2–3× faster reading.", word:"<span style='color:var(--text-dim)'>re</span><span class='p'>a</span><span>ding</span>" },
+  { heading:"Adjust your speed", desc:"Start at 150 WPM and work up. Most users hit 300–400 WPM within a week. You control the pace.", word:"<span style='color:var(--text-dim)'>spe</span><span class='p'>e</span><span>d</span>" },
+  { heading:"Track your progress", desc:"Every chapter is saved automatically. Come back anytime and pick up exactly where you left off.", word:"<span style='color:var(--text-dim)'>pro</span><span class='p'>g</span><span>ress</span>" }
+];
+
+function obStep1() {
+  const n = document.getElementById('ob-name').value.trim();
+  if (!n) return;
+  userName = n;
+  document.getElementById('ob-s1').classList.remove('active');
+  document.getElementById('ob-s2').classList.add('active');
+}
+
+document.getElementById('ob-name').addEventListener('keydown', e => { if(e.key==='Enter') obStep1(); });
+
+function selectCat(el, cat) {
+  document.querySelectorAll('.ob-cat').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  userCategory = cat;
+  document.getElementById('ob-s2-next').disabled = false;
+}
+
+function obStep2() {
+  if (!userCategory) return;
+  document.getElementById('ob-s2').classList.remove('active');
+  document.getElementById('ob-s3').classList.add('active');
+}
+
+function obTutNext() {
+  if (obTutStep < 2) {
+    obTutStep++;
+    document.getElementById('tut-heading').textContent = tutData[obTutStep].heading;
+    document.getElementById('tut-desc').textContent = tutData[obTutStep].desc;
+    document.getElementById('tut-word-el').innerHTML = tutData[obTutStep].word;
+    for(let i=0;i<3;i++) document.getElementById('td'+i).classList.toggle('on', i===obTutStep);
+    if (obTutStep === 2) document.getElementById('ob-s3-btn').textContent = "Let's go →";
+  } else {
+    launchApp();
+  }
+}
+
+function launchApp() {
+  // Save onboarding data to Supabase metadata (async, non-blocking)
+  if (currentUser) {
+    db.auth.updateUser({ data: {
+      full_name: userName,
+      category: userCategory,
+      onboarding_done: true
+    }}).catch(() => {});
+  }
+
+  document.getElementById('sb-avatar').textContent = (userName[0] || '?').toUpperCase();
+  document.getElementById('sb-name').textContent = userName;
+  const catNames = {jee:'JEE Preparation',neet:'NEET Preparation',upsc:'UPSC Preparation',ca:'CA Preparation',school:'School (6–12)',general:'General Reading'};
+  document.getElementById('sb-cat').textContent = catNames[userCategory] || 'General Reading';
+
+  const hr = new Date().getHours();
+  const greeting = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('lib-greeting').textContent = greeting + ', ' + userName + '.';
+
+  buildLibrary();
+  updatePremiumUI(isPremium);
+  document.getElementById('s-onboard').classList.remove('active');
+  document.getElementById('s-app').classList.add('active');
+}
+
+// ══ LIBRARY ══
+function buildLibrary() {
+  const grid = document.getElementById('book-grid');
+  grid.innerHTML = '';
+  BOOKS.forEach(book => {
+    const pct = Math.round((book.progress.reduce((a,b)=>a+b,0)/book.progress.length)*100);
+    const card = document.createElement('div');
+    card.className = 'book-card';
+    card.innerHTML = `
+      <div class="book-card-cover" style="background:${book.bg}">${book.emoji}</div>
+      <div class="book-card-title">${book.title}</div>
+      <div class="book-card-subject">${book.subject}</div>
+      <div class="book-card-prog">
+        <div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div>
+        <div class="prog-pct" style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-top:4px">${pct}% · ${book.progress.filter(p=>p===1).length}/${book.chapters.length} chapters</div>
+      </div>`;
+    card.onclick = () => openBook(book);
+    grid.appendChild(card);
+  });
+}
+
+function openBookById(id) { openBook(BOOKS[id]); }
+
+async function openBook(book) {
+  currentBook = book;
+  savedWordIdx = 0;
+
+  // Load saved progress from Supabase
+  const saved = await loadProgress(book.id);
+  if (saved) {
+    currentChapter = saved.current_chapter;
+    savedWordIdx = saved.current_word_index || 0;
+  } else {
+    currentChapter = book.progress.findIndex(p => p > 0 && p < 1);
+    if (currentChapter === -1) currentChapter = book.progress.findIndex(p => p === 0);
+    if (currentChapter === -1) currentChapter = 0;
+  }
+
+  document.getElementById('d-cover').style.background = book.bg;
+  document.getElementById('d-cover').textContent = book.emoji;
+  document.getElementById('d-cover').style.fontSize = '32px';
+  document.getElementById('d-title').textContent = book.title;
+  document.getElementById('d-subject').textContent = book.subject;
+
+  const pct = Math.round((book.progress.reduce((a,b)=>a+b,0)/book.progress.length)*100);
+  document.getElementById('d-overall-fill').style.width = pct+'%';
+  document.getElementById('d-overall-pct').textContent = pct+'%';
+
+  buildChapterList(book);
+  showView('detail');
+}
+
+function buildChapterList(book) {
+  const list = document.getElementById('chapter-list');
+  list.innerHTML = '';
+  book.chapters.forEach((ch, i) => {
+    const p = book.progress[i];
+    const done = p === 1, cur = p > 0 && p < 1;
+    const row = document.createElement('div');
+    row.className = 'chapter-item';
+    row.innerHTML = `
+      <div class="ch-num ${done?'done':cur?'current':'pending'}">${done?'✓':i+1}</div>
+      <div class="ch-info">
+        <div class="ch-name ${!done&&!cur?'pending':''}">Chapter ${i+1} · ${ch}</div>
+        ${cur?`<div class="ch-prog-mini"><div class="ch-prog-mini-fill" style="width:${p*100}%"></div></div>`:''}
+      </div>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>`;
+    row.onclick = () => { currentChapter = i; savedWordIdx = 0; openReader(); };
+    list.appendChild(row);
+  });
+}
+
+function restartBook() {
+  if (!currentBook) return;
+  currentBook.progress = currentBook.progress.map(()=>0);
+  currentChapter = 0;
+  buildChapterList(currentBook);
+  document.getElementById('d-overall-fill').style.width='0%';
+  document.getElementById('d-overall-pct').textContent='0%';
+}
+
+// ══ READER ══
+function openReader() {
+  if (!currentBook) return;
+  stopReading();
+  words = tokenize(currentBook.texts[currentChapter] || '');
+  wordIdx = savedWordIdx;
+  savedWordIdx = 0;
+
+  document.getElementById('r-book').textContent = currentBook.title.toUpperCase();
+  document.getElementById('r-chapter').textContent = `Chapter ${currentChapter+1} · ${currentBook.chapters[currentChapter]}`;
+  document.getElementById('ov-sub').textContent = `Chapter ${currentChapter+1} · ${currentBook.chapters[currentChapter]}`;
+  document.getElementById('word-el').innerHTML = '<span class="idle-hint">press play</span>';
+  document.getElementById('rprog-fill').style.width = '0%';
+  document.getElementById('rprog-l').textContent = 'word 0';
+  document.getElementById('rprog-r').textContent = Math.ceil(words.length/wpm)+' min';
+  document.getElementById('ch-complete').classList.remove('show');
+
+  showView('reader');
+}
+
+function exitReader() {
+  stopReading();
+  document.getElementById('ch-complete').classList.remove('show');
+  showView('detail');
+}
+
+function tokenize(text) { return text.trim().split(/\s+/).filter(w=>w.length>0); }
+
+function pivotIdx(word) {
+  const c = word.replace(/[^a-zA-Z]/g,'');
+  const l = c.length;
+  if(l<=1) return 0;
+  if(l<=5) return 1;
+  if(l<=9) return Math.floor(l*0.35);
+  return Math.floor(l*0.3);
+}
+
+function renderChunk(idx) {
+  const chunk = [];
+  for(let i=0;i<chunkSize&&idx+i<words.length;i++) chunk.push(words[idx+i]);
+  const w = chunk[0];
+  const pi = pivotIdx(w);
+  let html = `<span class="w-b">${w.slice(0,pi)}</span><span class="w-p">${w[pi]||''}</span><span class="w-a">${w.slice(pi+1)}</span>`;
+  if(chunk.length>1) html += ` <span class="w-a">${chunk.slice(1).join(' ')}</span>`;
+  return html;
+}
+
+function showWord() {
+  if(wordIdx>=words.length){ stopReading(); showChComplete(); return; }
+  const w = words[wordIdx];
+  if(w==='[DIAGRAM]'){ stopReading(); showDiagram(); wordIdx++; return; }
+  const el = document.getElementById('word-el');
+  el.innerHTML = renderChunk(wordIdx);
+  el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+  const pct=((wordIdx+1)/words.length)*100;
+  document.getElementById('rprog-fill').style.width=pct+'%';
+  document.getElementById('rprog-l').textContent=`word ${wordIdx+1}`;
+  document.getElementById('rprog-r').textContent=Math.ceil((words.length-wordIdx)/wpm)+' min left';
+  const delay = getDelay(w);
+  wordIdx += chunkSize;
+  timer = setTimeout(showWord, delay);
+}
+
+function getDelay(w) {
+  const b = 60000/wpm;
+  if(/[.!?]$/.test(w)) return b*2.2;
+  if(/[,;:]$/.test(w)) return b*1.4;
+  if(w.length>9) return b*1.2;
+  return b;
+}
+
+function togglePlay() {
+  if(playing){ stopReading(); }
+  else { playing=true; document.getElementById('play-icon').style.display='none'; document.getElementById('pause-icon').style.display='block'; showWord(); }
+}
+
+function stopReading() {
+  playing=false; clearTimeout(timer);
+  document.getElementById('play-icon').style.display='block';
+  document.getElementById('pause-icon').style.display='none';
+  saveProgress(); // auto-save on pause/stop
+}
+
+function skip(n) { wordIdx=Math.max(0,Math.min(wordIdx+n,words.length-1)); if(playing){clearTimeout(timer);showWord();} }
+
+function setWPM(v) { wpm=v; document.querySelectorAll('.preset').forEach(b=>b.classList.toggle('on',parseInt(b.textContent)===v)); }
+function setChunk(n) { chunkSize=n; document.querySelectorAll('.chunk').forEach((b,i)=>b.classList.toggle('on',i+1===n)); }
+
+function prevChapter() { if(!currentBook||currentChapter<=0) return; currentChapter--; openReader(); }
+function nextChapter() { if(!currentBook||currentChapter>=currentBook.chapters.length-1) return; currentChapter++; openReader(); }
+
+function showChComplete() { document.getElementById('ch-complete').classList.add('show'); }
+
+function continueNextChapter() {
+  document.getElementById('ch-complete').classList.remove('show');
+  if(currentBook&&currentChapter<currentBook.chapters.length-1){
+    currentBook.progress[currentChapter]=1;
+    currentChapter++;
+    savedWordIdx = 0;
+    saveProgress(); // save chapter completion
+    openReader();
+  } else { exitReader(); }
+}
+
+function showDiagram() { document.getElementById('diag-ov').classList.add('show'); }
+function closeDiagram() { document.getElementById('diag-ov').classList.remove('show'); if(wordIdx<words.length) togglePlay(); }
+
+// ══ VIEW SWITCHING ══
+function showView(v) {
+  document.getElementById('v-library').style.display = v==='library'?'block':'none';
+  document.getElementById('v-detail').style.display = v==='detail'?'block':'none';
+  document.getElementById('v-settings').style.display = v==='settings'?'block':'none';
+  const readerEl = document.getElementById('v-reader');
+  readerEl.style.display = v==='reader'?'flex':'none';
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  if(v==='library') document.getElementById('nav-lib').classList.add('active');
+  if(v==='settings') document.getElementById('nav-settings').classList.add('active');
+  document.querySelectorAll('.mob-nav-btn').forEach(n=>n.classList.remove('on'));
+  if(v!=='reader') document.querySelectorAll('.mob-nav-btn')[0].classList.add('on');
+}
+
+// ══ KEYBOARD ══
+document.addEventListener('keydown', e => {
+  const inReader = document.getElementById('v-reader').style.display==='flex';
+  const inOb = document.getElementById('s-onboard').classList.contains('active');
+  const inAuth = document.getElementById('s-auth').classList.contains('active');
+  if(inOb||inAuth) return;
+  if(!inReader) return;
+  if(e.code==='Space'){e.preventDefault();togglePlay();}
+  if(e.code==='ArrowRight') skip(10);
+  if(e.code==='ArrowLeft') skip(-10);
+  if(e.code==='ArrowUp'){const s=[150,250,350,500];const i=s.indexOf(wpm);if(i<s.length-1)setWPM(s[i+1]);}
+  if(e.code==='ArrowDown'){const s=[150,250,350,500];const i=s.indexOf(wpm);if(i>0)setWPM(s[i-1]);}
+});
+
+// ══ AUTH ══
+function switchAuthTab(tab) {
+  currentAuthTab = tab;
+  document.getElementById('tab-login').classList.toggle('active', tab==='login');
+  document.getElementById('tab-signup').classList.toggle('active', tab==='signup');
+  document.getElementById('auth-submit-btn').textContent = tab==='login' ? 'Log In' : 'Create Account';
+  document.getElementById('signup-name-wrap').style.display = tab==='signup' ? 'block' : 'none';
+  document.getElementById('auth-err').classList.remove('show');
+}
+
+function showAuthError(msg) {
+  const el = document.getElementById('auth-err');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+async function handleAuth() {
+  const email    = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-password').value;
+  const btn      = document.getElementById('auth-submit-btn');
+  if (!email || !password) { showAuthError('Please fill in all fields.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '…';
+  document.getElementById('auth-err').classList.remove('show');
+
+  try {
+    if (currentAuthTab === 'signup') {
+      const fullname = document.getElementById('auth-fullname').value.trim();
+      if (!fullname) { showAuthError('Please enter your name.'); btn.disabled=false; btn.textContent='Create Account'; return; }
+      const { data, error } = await db.auth.signUp({ email, password, options: { data: { full_name: fullname } } });
+      if (error) throw error;
+      currentUser = data.user;
+      // New user → onboarding
+      document.getElementById('s-auth').classList.remove('active');
+      document.getElementById('s-onboard').classList.add('active');
+    } else {
+      const { data, error } = await db.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      currentUser = data.user;
+      const meta = data.user.user_metadata || {};
+      isPremium = !!meta.is_premium;
+      if (meta.onboarding_done) {
+        userName     = meta.full_name || data.user.email.split('@')[0];
+        userCategory = meta.category || 'general';
+        document.getElementById('s-auth').classList.remove('active');
+        launchApp();
+      } else {
+        document.getElementById('s-auth').classList.remove('active');
+        document.getElementById('s-onboard').classList.add('active');
+      }
+    }
+  } catch(err) {
+    showAuthError(err.message || 'Something went wrong. Try again.');
+    btn.disabled = false;
+    btn.textContent = currentAuthTab === 'login' ? 'Log In' : 'Create Account';
+  }
+}
+
+// Enter key on auth inputs
+document.getElementById('auth-password').addEventListener('keydown', e => { if(e.key==='Enter') handleAuth(); });
+document.getElementById('auth-email').addEventListener('keydown',    e => { if(e.key==='Enter') handleAuth(); });
+
+// ── On load: restore existing session ──
+(async () => {
+  const { data: { session } } = await db.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    const meta  = session.user.user_metadata || {};
+    isPremium   = !!meta.is_premium;
+    if (meta.onboarding_done) {
+      userName     = meta.full_name || session.user.email.split('@')[0];
+      userCategory = meta.category || 'general';
+      document.getElementById('s-auth').classList.remove('active');
+      launchApp();
+    } else {
+      document.getElementById('s-auth').classList.remove('active');
+      document.getElementById('s-onboard').classList.add('active');
+    }
+  }
+  // else: auth screen stays active (default)
+})();
+
+// ══ SUPABASE PROGRESS ══
+async function saveProgress() {
+  if (!currentUser || !currentBook) return;
+  try {
+    await db.from('user_progress').upsert({
+      user_id:           currentUser.id,
+      book_id:           currentBook.id,
+      current_chapter:   currentChapter,
+      current_word_index: wordIdx,
+      updated_at:        new Date().toISOString()
+    }, { onConflict: 'user_id,book_id' });
+  } catch(e) { console.warn('Progress save failed:', e.message); }
+}
+
+async function loadProgress(bookId) {
+  if (!currentUser) return null;
+  try {
+    const { data } = await db.from('user_progress')
+      .select('current_chapter, current_word_index')
+      .eq('user_id', currentUser.id)
+      .eq('book_id', bookId)
+      .maybeSingle();
+    return data;
+  } catch(e) { return null; }
+}
+
+// ══ RAZORPAY ══
+function openRazorpay() {
+  if (isPremium) return;
+  if (!window.Razorpay) { alert('Payment gateway is loading. Please try again in a moment.'); return; }
+
+  const options = {
+    key:         'rzp_live_hR2fHWQXyNZM8W',
+    amount:      299900,
+    currency:    'INR',
+    name:        'Sharp',
+    description: 'Sharp Premium — Annual Subscription',
+    notes:       { plan_id: 'plan_SPQxJeds1KFTyQ' },
+    prefill:     { email: currentUser?.email || '' },
+    theme:       { color: '#c8ff57' },
+    handler: async function(response) {
+      try {
+        await db.auth.updateUser({ data: { is_premium: true } });
+        isPremium = true;
+        updatePremiumUI(true);
+      } catch(e) { console.warn('Premium flag update failed:', e); }
+    }
+  };
+
+  const rzp = new window.Razorpay(options);
+  rzp.open();
+}
+
+// ══ PREMIUM UI ══
+function updatePremiumUI(prem) {
+  isPremium = prem;
+  const nameEl = document.getElementById('plan-name');
+  const descEl = document.getElementById('plan-desc');
+  const btn    = document.getElementById('btn-subscribe');
+  if (!nameEl) return;
+  if (prem) {
+    nameEl.textContent = 'Sharp Premium';
+    descEl.textContent = 'Active — full access to all books & features';
+    btn.textContent    = '✓ Active';
+    btn.disabled       = true;
+  } else {
+    nameEl.textContent = 'Free Plan';
+    descEl.textContent = 'Upgrade for full access to all books';
+    btn.textContent    = 'Subscribe ₹2,999';
+    btn.disabled       = false;
+  }
+  // Update sidebar trial section
+  const trialEl = document.querySelector('.sidebar-trial');
+  if (trialEl) {
+    trialEl.innerHTML = prem
+      ? `<div class="trial-label">Plan</div><div class="trial-text"><strong>Sharp Premium</strong><br>Full access active</div>`
+      : `<div class="trial-label">Plan</div><div class="trial-text">Free tier<br><span style="color:var(--accent);cursor:pointer;font-weight:600;" onclick="showSettingsView()">Upgrade →</span></div>`;
+  }
+}
+
+// ══ SETTINGS VIEW ══
+function showSettingsView() {
+  showView('settings');
+  if (currentUser) {
+    document.getElementById('settings-email').textContent = currentUser.email;
+    document.getElementById('settings-name').textContent  = userName || '—';
+  }
+  updatePremiumUI(isPremium);
+}
+
+async function handleLogout() {
+  await db.auth.signOut().catch(() => {});
+  currentUser  = null;
+  userName     = '';
+  userCategory = '';
+  isPremium    = false;
+  // Reset auth form
+  document.getElementById('auth-email').value    = '';
+  document.getElementById('auth-password').value = '';
+  document.getElementById('auth-err').classList.remove('show');
+  switchAuthTab('login');
+  document.getElementById('s-app').classList.remove('active');
+  document.getElementById('s-auth').classList.add('active');
+}
+</script>
+</body>
+</html>
